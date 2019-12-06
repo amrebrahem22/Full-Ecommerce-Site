@@ -2,4 +2,5 @@
 __pycache__/
 media_root
 static_root
-env
+Pipfile
+Pipfile.lock
