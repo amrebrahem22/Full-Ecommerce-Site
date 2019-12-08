@@ -42,7 +42,8 @@ INSTALLED_APPS = [
     'allauth',
     'allauth.account',
     'allauth.socialaccount',
-    
+    'stripe',
+
     'crispy_forms',
     'django_countries',
 
@@ -145,3 +146,5 @@ SITE_ID = 1
 LOGIN_REDIRECT_URL = '/'
 
 CRISPY_TEMPLATE_PACK = "bootstrap4"
+
+STRIPE_SECRET_KEY = 'sk_test_eMPykiD7WnJiIZU9T3ag080E006btNSqyj'
