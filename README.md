@@ -1326,7 +1326,7 @@ urlpatterns = [
 ]
 ```
 - and in `checkout.html`
-``` python
+``` html
 {% extends "base.html" %}
 {% load crispy_forms_tags %}
 
@@ -2271,5 +2271,230 @@ path('add-coupon/', AddCouponView.as_view(), name='add-coupon'),
 
 {% endblock content %}
 ```
-#### Order management
+#### Order management and Refund
+- in `models.py` i added new fields for the refound
+``` python
+class Order(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL,
+                             on_delete=models.CASCADE)
+    ref_code = models.CharField(max_length=20)
+    items = models.ManyToManyField(OrderItem)
+    start_date = models.DateTimeField(auto_now_add=True)
+    ordered_date = models.DateTimeField()
+    ordered = models.BooleanField(default=False)
+    billing_address = models.ForeignKey(
+        'BillingAddress', on_delete=models.SET_NULL, blank=True, null=True)
+    payment = models.ForeignKey(
+        'Payment', on_delete=models.SET_NULL, blank=True, null=True)
+    coupon = models.ForeignKey(
+        'Coupon', on_delete=models.SET_NULL, blank=True, null=True)
+    being_delivered = models.BooleanField(default=False)
+    received = models.BooleanField(default=False)
+    refund_requested = models.BooleanField(default=False)
+    refund_granted = models.BooleanField(default=False)
+
+    '''
+    1. Item added to cart
+    2. Adding a billing address
+    (Failed checkout)
+    3. Payment
+    (Preprocessing, processing, packaging etc.)
+    4. Being delivered
+    5. Received
+    6. Refunds
+    '''
+    
+    # and update our method to subtract the coupon amount if there's coupon
+    def get_total(self):
+        total = 0
+        for order_item in self.items.all():
+            total += order_item.get_final_price()
+        if self.coupon:
+            total -= self.coupon.amount
+        return total
+
+# then create the refound model
+class Refund(models.Model):
+    order = models.ForeignKey(Order, on_delete=models.CASCADE)
+    reason = models.TextField()
+    accepted = models.BooleanField(default=False)
+    email = models.EmailField()
+
+    def __str__(self):
+        return f"{self.pk}"
+```
+- and in `admin.py`
+``` python
+from .models import Item, OrderItem, Order, Payment, Coupon, Refund
+
+def make_refund_accepted(modeladmin, request, queryset):
+    queryset.update(refund_requested=False, refund_granted=True)
+
+make_refund_accepted.short_description = 'Update orders to refund granted'
+
+class OrderAdmin(admin.ModelAdmin):
+    list_display = ['user',
+                    'ordered',
+                    'being_delivered',
+                    'received',
+                    'refund_requested',
+                    'refund_granted',
+                    'billing_address',
+                    'payment',
+                    'coupon'
+                    ]
+    list_display_links = [
+        'user',
+        'billing_address',
+        'payment',
+        'coupon'
+    ]
+    list_filter = ['ordered',
+                   'being_delivered',
+                   'received',
+                   'refund_requested',
+                   'refund_granted']
+    search_fields = [
+        'user__username',
+        'ref_code'
+    ]
+    actions = [make_refund_accepted]
+
+
+admin.site.register(Item)
+admin.site.register(OrderItem)
+admin.site.register(Order, OrderAdmin)
+admin.site.register(Payment)
+admin.site.register(Coupon)
+admin.site.register(Refund)
+```
+- and in `forms.py` i created the refund form
+``` python
+class RefundForm(forms.Form):
+    ref_code = forms.CharField()
+    message = forms.CharField(widget=forms.Textarea(attrs={
+        'rows': 4
+    }))
+    email = forms.EmailField()
+```
+- and in `views.py`
+``` python
+from .forms import CheckoutForm, CouponForm, RefundForm
+from .models import Item, OrderItem, Order, BillingAddress, Payment, Coupon, Refund
+
+import random
+import string
+import stripe
+stripe.api_key = settings.STRIPE_SECRET_KEY
+
+# this method will generate a random string
+def create_ref_code():
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))
+    
+# --------------- and in the paymentView - in the post method - in the try block
+# i will assign the order code to our new string generator
+# assign the payment to the order
+order_items = order.items.all()
+order_items.update(ordered=True)
+for item in order_items:
+    item.save()
+
+order.ordered = True
+order.payment = payment
+order.ref_code = create_ref_code()
+order.save()
+
+
+# then create our refun view that will display our form and if the form is valid will get the order with that id and will make the requested to True and save and add the rfund to our order refund fields
+class RequestRefundView(View):
+    def get(self, *args, **kwargs):
+        form = RefundForm()
+        context = {
+            'form': form
+        }
+        return render(self.request, "request_refund.html", context)
+
+    def post(self, *args, **kwargs):
+        form = RefundForm(self.request.POST)
+        if form.is_valid():
+            ref_code = form.cleaned_data.get('ref_code')
+            message = form.cleaned_data.get('message')
+            email = form.cleaned_data.get('email')
+            # edit the order
+            try:
+                order = Order.objects.get(ref_code=ref_code)
+                order.refund_requested = True
+                order.save()
+
+                # store the refund
+                refund = Refund()
+                refund.order = order
+                refund.reason = message
+                refund.email = email
+                refund.save()
+
+                messages.info(self.request, "Your request was received.")
+                return redirect("core:request-refund")
+
+            except ObjectDoesNotExist:
+                messages.info(self.request, "This order does not exist.")
+                return redirect("core:request-refund")
+```
+- now in `urls.py`
+``` python
+AddCouponView, RequestRefundView
+
+path('payment/<payment_option>/', PaymentView.as_view(), name='payment'),
+path('request-refund/', RequestRefundView.as_view(), name='request-refund')
+```
+- and in `order_snippet.html`
+``` python
+{% if order.coupon %}
+<li class="list-group-item d-flex justify-content-between bg-light">
+    <div class="text-success">
+    <h6 class="my-0">Promo code</h6>
+    <small>{{ order.coupon.code }}</small>
+    </div>
+    <span class="text-success">-${{ order.coupon.amount }}</span>
+</li>
+{% endif %}
+```
+- and in `request_refund.html`
+``` python
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+  <main>
+    <div class="container">
+
+    <h2>Request Refund</h2>
+    <form method="POST">
+        {% csrf_token %}
+        {{ form|crispy }}
+        <button type='submit' class='btn btn-primary'>Submit</button>
+    </form>
+
+    </div>
+  </main>
+
+{% endblock content %}
+```
+#### Default address functionality
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
