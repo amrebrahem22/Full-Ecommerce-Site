@@ -2448,7 +2448,7 @@ path('payment/<payment_option>/', PaymentView.as_view(), name='payment'),
 path('request-refund/', RequestRefundView.as_view(), name='request-refund')
 ```
 - and in `order_snippet.html`
-``` python
+``` html
 {% if order.coupon %}
 <li class="list-group-item d-flex justify-content-between bg-light">
     <div class="text-success">
@@ -2460,7 +2460,7 @@ path('request-refund/', RequestRefundView.as_view(), name='request-refund')
 {% endif %}
 ```
 - and in `request_refund.html`
-``` python
+``` html
 {% extends "base.html" %}
 {% load crispy_forms_tags %}
 
