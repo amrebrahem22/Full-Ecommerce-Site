@@ -9,7 +9,7 @@ Steps:
 3. `django-admin startproject EcomSite`
 4. `python manage.py startapp cors`
 
-#### create our model
+## create our model
 *now our model will have the `Item` that will display on the site and will have our `Order` that will have a relationship with the user and will have the items that assigned to this order and will have the `OrderItem` which is the `Item` but in the order and will have a relationship with the `Item`* </br>
 ``` python
 from django.conf import settings
@@ -451,7 +451,7 @@ grey lighten-3
 
 {% endblock content %}
 ```
-#### Add-to and remove-from cart
+## Add-to and remove-from cart
 - now in `models.py`
 ``` python
 from django.conf import settings
@@ -796,7 +796,7 @@ urlpatterns = [
 
 {% endblock content %}
 ```
-#### Improving the UI
+## Improving the UI
 - install crispy-form and add it to installed apps
 in `settings.py`
 ``` python
@@ -995,7 +995,7 @@ def cart_item_count(user):
 
 {% endblock %}
 ```
-#### Order summary view
+## Order summary view
 - now in our `OrderItem` in `models.py` i added these functions
 ``` python
 # this method will return the total price
@@ -1199,7 +1199,7 @@ def remove_single_item_from_cart(request, slug):
 
 {% endblock content %}
 ```
-#### Handling billing address and Checkout
+## Handling billing address and Checkout
 - first install `django-country`
 - then in `models.py` import it 
 ``` python
@@ -1512,7 +1512,7 @@ urlpatterns = [
 
 {% endblock content %}
 ```
-#### Payment view with stripe
+## Payment view with stripe
 - first install `stripe`
 - then in settings.py add the API_KEY `STRIPE_SECRET_KEY = ''` and add the `stripe` in the installed apps
 - in `models.py` i added the payment field in the order model and created the payment model
@@ -1908,7 +1908,7 @@ button:hover {
 
 {% endblock content %}
 ```
-#### Coupon codes
+## Coupon codes
 - now in `models.py` i will add the coupon field in order model
 ``` python
 class Order(models.Model):
@@ -2271,7 +2271,7 @@ path('add-coupon/', AddCouponView.as_view(), name='add-coupon'),
 
 {% endblock content %}
 ```
-#### Order management and Refund
+## Order management and Refund
 - in `models.py` i added new fields for the refound
 ``` python
 class Order(models.Model):
@@ -2480,7 +2480,7 @@ path('request-refund/', RequestRefundView.as_view(), name='request-refund')
 
 {% endblock content %}
 ```
-#### Default address functionality
+## Default address functionality
 
 
 
